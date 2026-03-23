@@ -357,7 +357,11 @@ async def list_tools() -> ListToolsResult:
             ),
             Tool(
                 name='odoo_unlink',
-                description='Permanently delete records from an Odoo model. This cannot be undone.',
+                description=(
+                    'Permanently delete records from an Odoo model. This cannot be undone.'
+                    'CRITICAL: You must explicitly ask the user for confirmation in the chat '
+                    'and wait for their approval before calling this tool.'
+                ),
                 inputSchema={
                     'type': 'object',
                     'required': ['model', 'ids'],
@@ -381,6 +385,9 @@ async def list_tools() -> ListToolsResult:
                 'Call any public method on an Odoo model. '
                 'Use for actions like confirming orders (action_confirm), '
                 'validating transfers (action_validate), etc.'
+                'CRITICAL: Because methods can mutate data, you must explain to the user '
+                'what method you are about to call and ask for their explicit permission '
+                'before calling this tool.'
             ),
             inputSchema={
                 'type': 'object',
