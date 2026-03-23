@@ -1,0 +1,14 @@
+# Core MCP SDK
+mcp
+
+# ASGI server for SSE transport
+uvicorn[standard]
+starlette
+
+# LangChain MCP adapter and providers
+langchain-mcp-adapters
+langchain
+langchain-core
+
+# LLM providers (install the ones you need)
+langchain-google-genai

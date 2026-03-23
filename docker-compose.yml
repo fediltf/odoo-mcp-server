@@ -1,0 +1,12 @@
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8765:8765"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
