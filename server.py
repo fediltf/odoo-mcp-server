@@ -23,21 +23,21 @@ logging.basicConfig(
 _logger = logging.getLogger('odoo_mcp')
 
 # ── Static config from environment (require container restart to change) ───────
-HOST          = os.environ.get('MCP_HOST', '0.0.0.0')
-PORT          = int(os.environ.get('MCP_PORT', '8765'))
-API_KEY       = os.environ.get('MCP_API_KEY', '')
-ODOO_URL      = os.environ.get('MCP_ODOO_URL', 'http://odoo:8069')
-ODOO_DB       = os.environ.get('MCP_ODOO_DB', '')
-ODOO_USER     = os.environ.get('MCP_ODOO_USER', 'admin')
+HOST = os.environ.get('MCP_HOST', '0.0.0.0')
+PORT = int(os.environ.get('MCP_PORT', '8765'))
+API_KEY = os.environ.get('MCP_API_KEY', '')
+ODOO_URL = os.environ.get('MCP_ODOO_URL', 'http://odoo:8069')
+ODOO_DB = os.environ.get('MCP_ODOO_DB', '')
+ODOO_USER = os.environ.get('MCP_ODOO_USER', 'admin')
 ODOO_PASSWORD = os.environ.get('MCP_ODOO_PASSWORD', '')
 
 # How often (seconds) to re-fetch operational settings from Odoo
 CONFIG_TTL_SECONDS = int(os.environ.get('MCP_CONFIG_TTL', '30'))
 
 # ── Fallback values from env (used if Odoo is unreachable at config fetch time)
-_FALLBACK_ALLOW_WRITE   = os.environ.get('MCP_ALLOW_WRITE', '0') == '1'
+_FALLBACK_ALLOW_WRITE = os.environ.get('MCP_ALLOW_WRITE', '0') == '1'
 _FALLBACK_ALLOW_EXECUTE = os.environ.get('MCP_ALLOW_EXECUTE', '0') == '1'
-_raw_models             = os.environ.get('MCP_ALLOWED_MODELS', '')
+_raw_models = os.environ.get('MCP_ALLOWED_MODELS', '')
 _FALLBACK_ALLOWED_MODELS: set[str] = {m.strip() for m in _raw_models.split(',') if m.strip()}
 
 
@@ -87,10 +87,10 @@ class LiveConfig:
     """
 
     def __init__(self):
-        self.allow_write    = _FALLBACK_ALLOW_WRITE
-        self.allow_execute  = _FALLBACK_ALLOW_EXECUTE
+        self.allow_write = _FALLBACK_ALLOW_WRITE
+        self.allow_execute = _FALLBACK_ALLOW_EXECUTE
         self.allowed_models = _FALLBACK_ALLOWED_MODELS
-        self._fetched_at    = 0.0  # force fetch on first access
+        self._fetched_at = 0.0  # force fetch on first access
 
     def _refresh(self):
         now = time.monotonic()
@@ -110,7 +110,7 @@ class LiveConfig:
                 return
 
             cfg = records[0]
-            self.allow_write   = bool(cfg.get('allow_write', False))
+            self.allow_write = bool(cfg.get('allow_write', False))
             self.allow_execute = bool(cfg.get('allow_execute', False))
 
             # Fetch allowed model names from the related mcp.allowed.model records
@@ -160,7 +160,6 @@ class LiveConfig:
 
 
 config = LiveConfig()
-
 
 # ── MCP Server ─────────────────────────────────────────────────────────────────
 mcp = Server('odoo-mcp-server')
@@ -291,6 +290,23 @@ async def list_tools() -> ListToolsResult:
                 },
             },
         ),
+        Tool(
+            name='odoo_count',
+            description='Count records matching a domain without fetching any data. '
+                        'Use this before search_read when you only need the total.',
+            inputSchema={
+                'type': 'object',
+                'required': ['model'],
+                'properties': {
+                    'model': {'type': 'string'},
+                    'domain': {
+                        'type': 'string',
+                        'description': 'JSON-encoded domain filter. Default "[]" = all records.',
+                        'default': '[]',
+                    },
+                },
+            },
+        )
     ]
 
     # Write tools — only added if currently enabled in Odoo config
@@ -448,10 +464,19 @@ async def call_tool(name: str, arguments: dict) -> CallToolResult:  # noqa: C901
             return _ok(odoo.execute(model, 'read', arguments['ids'],
                                     fields=arguments.get('fields')))
 
+        # ── odoo_count ─────────────────────────────────────────────────────────
+        elif name == 'odoo_count':
+            model = arguments['model']
+            config.check_model(model)
+            raw = arguments.get('domain', '[]')
+            domain = json.loads(raw) if isinstance(raw, str) else raw
+            return _ok({'count': odoo.execute(model, 'search_count', domain)})
+
         # ── odoo_create ───────────────────────────────────────────────────────
         elif name == 'odoo_create':
             if not config.write_enabled:
-                return _err('Write operations are currently disabled. Enable "Allow Write Operations" in the Odoo MCP configuration.')
+                return _err(
+                    'Write operations are currently disabled. Enable "Allow Write Operations" in the Odoo MCP configuration.')
             model = arguments['model']
             config.check_model(model)
             raw_values = arguments['values']
@@ -461,17 +486,21 @@ async def call_tool(name: str, arguments: dict) -> CallToolResult:  # noqa: C901
         # ── odoo_write ────────────────────────────────────────────────────────
         elif name == 'odoo_write':
             if not config.write_enabled:
-                return _err('Write operations are currently disabled. Enable "Allow Write Operations" in the Odoo MCP configuration.')
+                return _err(
+                    'Write operations are currently disabled. Enable "Allow Write Operations" in the Odoo MCP configuration.')
             model = arguments['model']
             config.check_model(model)
             return _ok({'success': odoo.execute(model, 'write',
                                                 arguments['ids'],
-                                                json.loads(arguments['values']) if isinstance(arguments['values'], str) else arguments['values'])})
+                                                json.loads(arguments['values']) if isinstance(arguments['values'],
+                                                                                              str) else arguments[
+                                                    'values'])})
 
         # ── odoo_unlink ───────────────────────────────────────────────────────
         elif name == 'odoo_unlink':
             if not config.write_enabled:
-                return _err('Write operations are currently disabled. Enable "Allow Write Operations" in the Odoo MCP configuration.')
+                return _err(
+                    'Write operations are currently disabled. Enable "Allow Write Operations" in the Odoo MCP configuration.')
             model = arguments['model']
             config.check_model(model)
             return _ok({'success': odoo.execute(model, 'unlink', arguments['ids'])})
@@ -479,7 +508,8 @@ async def call_tool(name: str, arguments: dict) -> CallToolResult:  # noqa: C901
         # ── odoo_execute_method ───────────────────────────────────────────────
         elif name == 'odoo_execute_method':
             if not config.execute_enabled:
-                return _err('Method execution is currently disabled. Enable "Allow Method Execution" in the Odoo MCP configuration.')
+                return _err(
+                    'Method execution is currently disabled. Enable "Allow Method Execution" in the Odoo MCP configuration.')
             model = arguments['model']
             config.check_model(model)
             # args and kwargs are passed as JSON strings for cross-LLM schema compatibility
@@ -531,7 +561,6 @@ app = Starlette(
     ],
     middleware=[Middleware(ApiKeyMiddleware)],
 )
-
 
 if __name__ == '__main__':
     _logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
